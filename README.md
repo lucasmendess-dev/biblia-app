@@ -1,6 +1,6 @@
 # Bíblia 📖
 
-App de leitura da Bíblia — simples, amigável e bonito. Versão atual: v0.2.0, feito como PWA em HTML, CSS e JavaScript puro, sem etapa de build.
+App de leitura da Bíblia — simples, amigável e bonito. Versão atual: v0.3.0, feito como PWA em HTML, CSS e JavaScript puro, sem etapa de build.
 
 ![Telas do app](docs/screenshot.png)
 
@@ -8,7 +8,7 @@ O visual segue uma linguagem de cinzas suaves, cards em grafite e acento azul, c
 
 ## Funcionalidades
 
-- **Atividade de leitura** no estilo do GitHub: mapa dos dias em que você leu, com total da semana
+- **Atividade semanal**: capítulos lidos em cada dia da semana, com navegação entre semanas e comparação com a anterior
 - **Início** com saudação, *versículo do dia*, sequência de dias de leitura e atalhos (continuar lendo, livros, favoritos, plano ativo)
 - **Planos de leitura**: Evangelhos, Salmos e Provérbios, Novo Testamento e Bíblia completa, com progresso
 - **66 livros** organizados por Antigo/Novo Testamento e por grupo, com busca (ignora acentos) e seletor de capítulos
@@ -17,6 +17,7 @@ O visual segue uma linguagem de cinzas suaves, cards em grafite e acento azul, c
 - **Versões**: Almeida, ARA, ARC, ACF, NAA, NVT, NTLH e King James Atualizada
 - **Aparência**: controle circular do tamanho da letra, espaçamento entre linhas e temas Auto, Sépia, Dia e Noite
 - **Favoritos** e **Perfil** com estatísticas
+- Gesto de voltar do Android navega entre as telas; para sair, é preciso voltar duas vezes na tela inicial
 - Funciona offline depois de aberto (service worker + cache local dos capítulos já lidos)
 
 Todo o progresso fica salvo no próprio aparelho (localStorage).

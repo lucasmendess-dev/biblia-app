@@ -85,7 +85,12 @@ async function copyText(text) {
 }
 
 /* ================= Router (hash) ================= */
-function go(path) { location.hash = path; }
+let navDepth = 0; // quantas telas foram abertas dentro do app (para o botão voltar)
+function go(path) {
+  if (location.hash === '#' + path) return;
+  navDepth++;
+  location.hash = path;
+}
 
 function parseRoute() {
   const [path, query] = location.hash.replace(/^#/, '').split('?');
@@ -168,20 +173,7 @@ function renderHome(params) {
       </div>
     </article>
 
-    <section class="activity" id="activity">
-      <div class="activity-head">
-        <div><h3>Atividade de leitura</h3><p id="activity-sub"></p></div>
-        <div class="week-total"><b>${weekTotal()}</b><span>nesta semana</span></div>
-      </div>
-      <div class="heat-wrap">
-        <div class="heat-months" id="heat-months"></div>
-        <div class="heat-body">
-          <div class="heat-days"><span></span><span>Seg</span><span></span><span>Qua</span><span></span><span>Sex</span><span></span></div>
-          <div class="heat-grid" id="heat-grid"></div>
-        </div>
-      </div>
-      <div class="heat-legend"><span>Menos</span><i class="l0"></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i><span>Mais</span></div>
-    </section>
+    <section class="activity" id="activity"></section>
 
     <div class="segmented" role="tablist">
       <button class="${tab === 'inicio' ? 'active' : ''}" data-action="home-tab" data-tab="inicio">Atalhos</button>
@@ -237,16 +229,18 @@ function renderHome(params) {
     `}
   `;
 
-  drawHeatmap();
+  weekOffset = 0;
+  drawActivity();
 
   fetchVerse(db, dc, dv, state.version)
     .then(v => { const el = $('#daily-text'); if (el) { el.textContent = v.t; el.classList.remove('loading'); } })
     .catch(() => { const el = $('#daily-text'); if (el) el.textContent = 'Sem conexão. Toque para tentar abrir o capítulo.'; });
 }
 
-/* ================= Atividade (estilo GitHub) ================= */
-const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+/* ================= Atividade semanal ================= */
+const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const level = (n) => (n <= 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : n <= 4 ? 3 : 4);
+let weekOffset = 0; // 0 = semana atual, -1 = semana passada…
 
 function startOfWeek(d = new Date()) {
   const s = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -254,49 +248,61 @@ function startOfWeek(d = new Date()) {
   return s;
 }
 
-function weekTotal() {
+function weekDays(offset) {
   const s = startOfWeek();
-  let n = 0;
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(s); d.setDate(s.getDate() + i);
-    n += state.activity[dayKey(d)] || 0;
-  }
-  return n;
+  s.setDate(s.getDate() + offset * 7);
+  return Array.from({ length: 7 }, (_, i) => { const d = new Date(s); d.setDate(s.getDate() + i); return d; });
 }
 
-function drawHeatmap() {
-  const grid = $('#heat-grid');
-  if (!grid) return;
-  const CELL = 13, GAP = 3, STEP = CELL + GAP;
-  const width = grid.clientWidth || 280;
-  const weeks = Math.max(8, Math.min(53, Math.floor((width + GAP) / STEP)));
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const first = startOfWeek(today);
-  first.setDate(first.getDate() - (weeks - 1) * 7);
+const weekSum = (days) => days.reduce((n, d) => n + (state.activity[dayKey(d)] || 0), 0);
 
-  const cells = [];
-  const months = [];
-  let total = 0, activeDays = 0, lastLabelCol = -3;
-  for (let w = 0; w < weeks; w++) {
-    for (let d = 0; d < 7; d++) {
-      const day = new Date(first); day.setDate(first.getDate() + w * 7 + d);
-      const key = dayKey(day);
-      if (day > today) { cells.push('<i class="future"></i>'); continue; }
-      const n = state.activity[key] || 0;
-      total += n; if (n) activeDays++;
-      cells.push(`<i class="l${level(n)}${day.getTime() === today.getTime() ? ' today' : ''}" data-day="${key}" data-n="${n}"></i>`);
-      // rótulo do mês na primeira semana em que ele aparece
-      if (day.getDate() === 1 || (w === 0 && d === 0)) {
-        if (w - lastLabelCol >= 3) { months.push(`<span style="left:${w * STEP}px">${MONTHS[day.getMonth()]}</span>`); lastLabelCol = w; }
-      }
-    }
-  }
-  grid.style.gridTemplateColumns = `repeat(${weeks}, ${CELL}px)`;
-  grid.innerHTML = cells.join('');
-  $('#heat-months').innerHTML = months.join('');
-  $('#activity-sub').textContent = total
-    ? `${total} ${total === 1 ? 'capítulo' : 'capítulos'} em ${activeDays} ${activeDays === 1 ? 'dia' : 'dias'} · ${Math.round(weeks / 4.35)} meses`
-    : 'Leia um capítulo para começar sua sequência';
+function weekRangeLabel(days) {
+  const a = days[0], b = days[6];
+  const m = (d) => new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(d).replace('.', '');
+  return a.getMonth() === b.getMonth()
+    ? `${a.getDate()} – ${b.getDate()} de ${m(b)}`
+    : `${a.getDate()} de ${m(a)} – ${b.getDate()} de ${m(b)}`;
+}
+
+function drawActivity() {
+  const box = $('#activity');
+  if (!box) return;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const days = weekDays(weekOffset);
+  const total = weekSum(days);
+  const prev = weekSum(weekDays(weekOffset - 1));
+  const active = days.filter(d => state.activity[dayKey(d)]).length;
+  const title = weekOffset === 0 ? 'Esta semana' : weekOffset === -1 ? 'Semana passada' : weekRangeLabel(days);
+  const diff = total - prev;
+
+  box.innerHTML = `
+    <div class="activity-head">
+      <div>
+        <h3>${title}</h3>
+        <p>${weekOffset > -2 ? weekRangeLabel(days) : 'Atividade de leitura'}</p>
+      </div>
+      <div class="week-nav">
+        <button data-action="week" data-dir="-1" aria-label="Semana anterior">${icon('back', 16)}</button>
+        <button data-action="week" data-dir="1" aria-label="Próxima semana" ${weekOffset >= 0 ? 'disabled' : ''}>${icon('right', 16)}</button>
+      </div>
+    </div>
+    <div class="week-row">
+      ${days.map((d, i) => {
+        const n = state.activity[dayKey(d)] || 0;
+        const future = d > today;
+        const isToday = d.getTime() === today.getTime();
+        return `
+        <div class="day ${isToday ? 'today' : ''} ${future ? 'future' : ''}">
+          <span class="wd">${WEEKDAYS[i]}</span>
+          <span class="cell l${future ? 0 : level(n)}">${n && !future ? n : ''}</span>
+          <span class="dn">${d.getDate()}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="week-foot">
+      <span><b>${total}</b> ${total === 1 ? 'capítulo' : 'capítulos'} · ${active} de 7 dias</span>
+      ${prev || total ? `<span class="trend ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}">${diff > 0 ? '+' : ''}${diff} vs. anterior</span>` : ''}
+    </div>`;
 }
 
 /* ================= Livros ================= */
@@ -567,7 +573,7 @@ function renderProfile() {
       </button>
     </div>
 
-    <p class="about">Bíblia · versão 0.2.0<br>Almeida (domínio público) via <a href="https://bible-api.com" target="_blank" rel="noopener">bible-api.com</a><br>Demais versões via <a href="https://bolls.life" target="_blank" rel="noopener">bolls.life</a></p>`;
+    <p class="about">Bíblia · versão 0.3.0<br>Almeida (domínio público) via <a href="https://bible-api.com" target="_blank" rel="noopener">bible-api.com</a><br>Demais versões via <a href="https://bolls.life" target="_blank" rel="noopener">bolls.life</a></p>`;
 
   $('#name').onchange = (e) => { update({ name: e.target.value.trim() }); renderProfile(); };
 }
@@ -719,6 +725,7 @@ const actions = {
   },
   'open-settings': () => openSettings(),
   'open-versions': () => openVersions(),
+  week: (el) => { weekOffset = Math.min(0, weekOffset + Number(el.dataset.dir)); drawActivity(); },
   'set-version': (el) => {
     update({ version: el.dataset.version });
     closeSheet();
@@ -761,14 +768,6 @@ async function share(text) {
 }
 
 app.addEventListener('click', (e) => {
-  // toque em um dia do mapa de atividade
-  const cell = e.target.closest('#heat-grid i[data-day]');
-  if (cell) {
-    const [y, m, d] = cell.dataset.day.split('-').map(Number);
-    const n = Number(cell.dataset.n);
-    const when = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(y, m - 1, d));
-    return toast(n ? `${n} ${n === 1 ? 'capítulo' : 'capítulos'} · ${when}` : `Nenhuma leitura · ${when}`);
-  }
   // toque em versículo
   const verse = e.target.closest('#chapter-text .v');
   if (verse) {
@@ -792,6 +791,32 @@ nav.addEventListener('click', (e) => {
 $('#sheet-backdrop').addEventListener('click', closeSheet);
 
 window.addEventListener('hashchange', render);
+
+/* ================= Botão/gesto "voltar" do Android ================= */
+let lastBackAt = 0;
+function handleBack() {
+  if ($('#sheet').classList.contains('show')) return closeSheet();
+  if ($('#verse-bar').classList.contains('show')) return hideVerseBar();
+  const r = parseRoute();
+  const atRoot = !state.onboarded || (r.name === 'home' && !r.params.get('tab'));
+  if (!atRoot) {
+    if (navDepth > 0) { navDepth--; history.back(); }
+    else location.replace('#/home');
+    return;
+  }
+  // na tela inicial: é preciso voltar duas vezes para sair
+  if (Date.now() - lastBackAt < 2000) {
+    window.Capacitor?.Plugins?.App?.exitApp();
+  } else {
+    lastBackAt = Date.now();
+    toast('Deslize de novo para sair');
+  }
+}
+
+const CapApp = window.Capacitor?.Plugins?.App;
+if (CapApp && window.Capacitor.isNativePlatform?.()) {
+  CapApp.addListener('backButton', handleBack);
+}
 
 /* ================= Inicialização ================= */
 applyPrefs();

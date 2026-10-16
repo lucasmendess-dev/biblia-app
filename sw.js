@@ -1,5 +1,5 @@
 // Service worker: guarda a "casca" do app para funcionar offline
-const CACHE = 'biblia-shell-v2';
+const CACHE = 'biblia-shell-v3';
 const SHELL = [
   './', './index.html', './css/styles.css', './manifest.webmanifest', './icons/icon.svg',
   './js/app.js', './js/books.js', './js/store.js', './js/api.js', './js/icons.js', './js/versions.js',
