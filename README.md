@@ -57,3 +57,7 @@ manifest.webmanifest  instalação como PWA
 - Anotações e marca-texto com cores
 - Outras traduções e modo totalmente offline
 - Lembrete diário de leitura
+
+## APK para Android
+
+A cada push na `main`, o GitHub Actions empacota o app com [Capacitor](https://capacitorjs.com) e publica o `biblia.apk` na aba **Releases**. Baixe o arquivo no celular e permita "instalar apps desconhecidos" para instalar.

@@ -1,0 +1,68 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Preparar projeto Capacitor
+        run: |
+          mkdir -p build/www
+          cp -r index.html css js icons manifest.webmanifest sw.js build/www/
+          cp -r resources build/assets
+          cd build
+          cat > package.json <<'JSON'
+          { "name": "biblia-app", "version": "0.1.0", "private": true }
+          JSON
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/assets@3
+          cat > capacitor.config.json <<'JSON'
+          {
+            "appId": "com.lucasmendes.biblia",
+            "appName": "Bíblia",
+            "webDir": "www",
+            "android": { "backgroundColor": "#f4f4f5" }
+          }
+          JSON
+          npx cap add android
+          npx capacitor-assets generate --android --iconBackgroundColor '#2d2d2f' --splashBackgroundColor '#f4f4f5' || echo "Geração de ícones falhou, usando padrão"
+          npx cap sync android
+
+      - name: Compilar APK
+        working-directory: build/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/biblia.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: biblia-apk
+          path: biblia.apk
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" biblia.apk \
+            --title "Bíblia (build ${GITHUB_RUN_NUMBER})" \
+            --notes "APK de teste (debug) gerado automaticamente a partir de ${GITHUB_SHA::7}. Para instalar, baixe o arquivo biblia.apk no celular e permita a instalação de fontes desconhecidas." \
+            --latest
