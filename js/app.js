@@ -1,5 +1,6 @@
 import { BOOKS, BOOK_BY_ID, TOTAL_CHAPTERS, DAILY_VERSES, PLANS } from './books.js';
-import { state, update, save, markRead, isRead, readCount, isFavorite, toggleFavorite, currentStreak, resetAll } from './store.js';
+import { state, update, save, markRead, isRead, readCount, isFavorite, toggleFavorite, currentStreak, resetAll, dayKey } from './store.js';
+import { VERSIONS, getVersion } from './versions.js';
 import { fetchChapter, fetchVerse } from './api.js';
 import { icon } from './icons.js';
 
@@ -157,7 +158,7 @@ function renderHome(params) {
 
     <article class="hero" data-action="open-daily" role="button" tabindex="0">
       <div class="art">${icon('sparkle', 26)}</div>
-      <div class="eyebrow">${icon('calendar', 13)} Versículo do dia</div>
+      <div class="eyebrow">${icon('calendar', 13)} Versículo do dia · ${getVersion(state.version).abbr}</div>
       <div class="ref">${refLabel(db, dc, dv)}</div>
       <p class="verse loading" id="daily-text">Carregando…</p>
       <div class="hero-stats">
@@ -166,6 +167,21 @@ function renderHome(params) {
         <div><b>Favoritos</b><span>${state.favorites.length}</span></div>
       </div>
     </article>
+
+    <section class="activity" id="activity">
+      <div class="activity-head">
+        <div><h3>Atividade de leitura</h3><p id="activity-sub"></p></div>
+        <div class="week-total"><b>${weekTotal()}</b><span>nesta semana</span></div>
+      </div>
+      <div class="heat-wrap">
+        <div class="heat-months" id="heat-months"></div>
+        <div class="heat-body">
+          <div class="heat-days"><span></span><span>Seg</span><span></span><span>Qua</span><span></span><span>Sex</span><span></span></div>
+          <div class="heat-grid" id="heat-grid"></div>
+        </div>
+      </div>
+      <div class="heat-legend"><span>Menos</span><i class="l0"></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i><span>Mais</span></div>
+    </section>
 
     <div class="segmented" role="tablist">
       <button class="${tab === 'inicio' ? 'active' : ''}" data-action="home-tab" data-tab="inicio">Atalhos</button>
@@ -221,9 +237,66 @@ function renderHome(params) {
     `}
   `;
 
-  fetchVerse(db, dc, dv)
+  drawHeatmap();
+
+  fetchVerse(db, dc, dv, state.version)
     .then(v => { const el = $('#daily-text'); if (el) { el.textContent = v.t; el.classList.remove('loading'); } })
     .catch(() => { const el = $('#daily-text'); if (el) el.textContent = 'Sem conexão. Toque para tentar abrir o capítulo.'; });
+}
+
+/* ================= Atividade (estilo GitHub) ================= */
+const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const level = (n) => (n <= 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : n <= 4 ? 3 : 4);
+
+function startOfWeek(d = new Date()) {
+  const s = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  s.setDate(s.getDate() - s.getDay()); // domingo
+  return s;
+}
+
+function weekTotal() {
+  const s = startOfWeek();
+  let n = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(s); d.setDate(s.getDate() + i);
+    n += state.activity[dayKey(d)] || 0;
+  }
+  return n;
+}
+
+function drawHeatmap() {
+  const grid = $('#heat-grid');
+  if (!grid) return;
+  const CELL = 13, GAP = 3, STEP = CELL + GAP;
+  const width = grid.clientWidth || 280;
+  const weeks = Math.max(8, Math.min(53, Math.floor((width + GAP) / STEP)));
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const first = startOfWeek(today);
+  first.setDate(first.getDate() - (weeks - 1) * 7);
+
+  const cells = [];
+  const months = [];
+  let total = 0, activeDays = 0, lastLabelCol = -3;
+  for (let w = 0; w < weeks; w++) {
+    for (let d = 0; d < 7; d++) {
+      const day = new Date(first); day.setDate(first.getDate() + w * 7 + d);
+      const key = dayKey(day);
+      if (day > today) { cells.push('<i class="future"></i>'); continue; }
+      const n = state.activity[key] || 0;
+      total += n; if (n) activeDays++;
+      cells.push(`<i class="l${level(n)}${day.getTime() === today.getTime() ? ' today' : ''}" data-day="${key}" data-n="${n}"></i>`);
+      // rótulo do mês na primeira semana em que ele aparece
+      if (day.getDate() === 1 || (w === 0 && d === 0)) {
+        if (w - lastLabelCol >= 3) { months.push(`<span style="left:${w * STEP}px">${MONTHS[day.getMonth()]}</span>`); lastLabelCol = w; }
+      }
+    }
+  }
+  grid.style.gridTemplateColumns = `repeat(${weeks}, ${CELL}px)`;
+  grid.innerHTML = cells.join('');
+  $('#heat-months').innerHTML = months.join('');
+  $('#activity-sub').textContent = total
+    ? `${total} ${total === 1 ? 'capítulo' : 'capítulos'} em ${activeDays} ${activeDays === 1 ? 'dia' : 'dias'} · ${Math.round(weeks / 4.35)} meses`
+    : 'Leia um capítulo para começar sua sequência';
 }
 
 /* ================= Livros ================= */
@@ -233,7 +306,7 @@ function renderBooks(params) {
 
   view.innerHTML = `
     <header class="topbar">
-      <div><h1>Bíblia</h1><div class="sub">João Ferreira de Almeida</div></div>
+      <div><h1>Bíblia</h1><button class="version-pill" data-action="open-versions">${getVersion(state.version).name} ${icon('down', 14)}</button></div>
       <button class="round-btn" data-action="open-settings" aria-label="Aparência">${icon('type', 18)}</button>
     </header>
     <label class="search">${icon('search', 18)}<input id="book-search" type="search" placeholder="Buscar livro…" autocomplete="off"></label>
@@ -313,7 +386,7 @@ function renderReader(bookId, chapter, focusVerse) {
   view.innerHTML = `
     <header class="topbar center">
       <button class="round-btn" data-action="nav" data-to="/books?t=${b.testament}" aria-label="Voltar">${icon('back', 18)}</button>
-      <h1>${b.name}</h1>
+      <div class="reader-title"><h1>${b.name}</h1><button class="version-pill small" data-action="open-versions">${getVersion(state.version).abbr} ${icon('down', 12)}</button></div>
       <button class="round-btn" data-action="open-settings" aria-label="Aparência">${icon('more', 18)}</button>
     </header>
 
@@ -372,11 +445,11 @@ function renderReader(bookId, chapter, focusVerse) {
 async function loadChapterText(bookId, chapter, focusVerse) {
   const box = $('#chapter-text');
   try {
-    const { verses } = await fetchChapter(bookId, chapter);
+    const { verses } = await fetchChapter(bookId, chapter, state.version);
     if (!readerCtx || readerCtx.book !== bookId || readerCtx.chapter !== chapter) return;
     readerCtx.verses = verses;
     box.innerHTML = verses.map(v =>
-      `<span class="v ${isFavorite(bookId, chapter, v.n) ? 'fav' : ''}" data-n="${v.n}"><sup>${v.n}</sup>${esc(v.t)} </span>`
+      `<p class="v ${isFavorite(bookId, chapter, v.n) ? 'fav' : ''}" data-n="${v.n}"><sup>${v.n}</sup>${esc(v.t)}</p>`
     ).join('');
     if (focusVerse) {
       const el = $(`.v[data-n="${focusVerse}"]`, box);
@@ -406,7 +479,7 @@ function selectionLabel() {
 function selectionText() {
   const nums = [...selected].sort((a, b) => a - b);
   const text = nums.map(n => readerCtx.verses.find(v => v.n === n)?.t).filter(Boolean).join(' ');
-  return `"${text}"\n— ${selectionLabel()} (Almeida)`;
+  return `"${text}"\n— ${selectionLabel()} (${getVersion(state.version).abbr})`;
 }
 
 function showVerseBar() {
@@ -434,7 +507,7 @@ function renderFavorites() {
     ${favs.length ? `<div class="list">
       ${favs.map((f, i) => `
         <article class="fav-card">
-          <div class="head"><b>${refLabel(f.book, f.chapter, f.verse)}</b>
+          <div class="head"><b>${refLabel(f.book, f.chapter, f.verse)} <small>${getVersion(f.version).abbr}</small></b>
             <span style="display:flex;gap:2px">
               <button data-action="fav-share" data-i="${i}" aria-label="Compartilhar">${icon('share', 16)}</button>
               <button data-action="fav-remove" data-i="${i}" aria-label="Remover">${icon('trash', 16)}</button>
@@ -480,6 +553,10 @@ function renderProfile() {
         <span class="bubble">${icon('type', 17)}</span>
         <div class="info"><b>Leitura e aparência</b><span>${themeName} · fonte ${state.fontScale}%</span></div>${icon('right', 16)}
       </button>
+      <button class="setting-row" data-action="open-versions">
+        <span class="bubble">${icon('book', 17)}</span>
+        <div class="info"><b>Versão da Bíblia</b><span>${getVersion(state.version).name}</span></div>${icon('right', 16)}
+      </button>
       <button class="setting-row" data-action="home-tab" data-tab="planos">
         <span class="bubble">${icon(plan.icon, 17)}</span>
         <div class="info"><b>Plano de leitura</b><span>${plan.title}</span></div>${icon('right', 16)}
@@ -490,7 +567,7 @@ function renderProfile() {
       </button>
     </div>
 
-    <p class="about">Bíblia · versão 0.1.0<br>Texto: João Ferreira de Almeida (domínio público)<br>via <a href="https://bible-api.com" target="_blank" rel="noopener">bible-api.com</a></p>`;
+    <p class="about">Bíblia · versão 0.2.0<br>Almeida (domínio público) via <a href="https://bible-api.com" target="_blank" rel="noopener">bible-api.com</a><br>Demais versões via <a href="https://bolls.life" target="_blank" rel="noopener">bolls.life</a></p>`;
 
   $('#name').onchange = (e) => { update({ name: e.target.value.trim() }); renderProfile(); };
 }
@@ -516,6 +593,10 @@ function openSettings() {
 
   openSheet(`
     <h2>Leitura</h2>
+    <button class="setting-row" style="margin-top:12px" data-action="open-versions">
+      <span class="bubble">${icon('book', 17)}</span>
+      <div class="info"><b>Versão</b><span>${getVersion(state.version).name}</span></div>${icon('right', 16)}
+    </button>
     <div class="options" id="lh-options">
       ${[['compact', 'Compacto'], ['normal', 'Normal'], ['wide', 'Amplo']].map(([k, l]) =>
         `<button data-lh="${k}" class="${state.lineHeight === k ? 'active' : ''}">${l}</button>`).join('')}
@@ -582,6 +663,21 @@ function openSettings() {
   };
 }
 
+/* ================= Folha de versões ================= */
+function openVersions() {
+  openSheet(`
+    <h2>Versão da Bíblia</h2>
+    <p class="hint">A escolha vale para a leitura e o versículo do dia</p>
+    <div class="list">
+      ${VERSIONS.map(v => `
+        <button class="version-row ${v.id === state.version ? 'active' : ''}" data-action="set-version" data-version="${v.id}">
+          <span class="abbr">${v.abbr}</span>
+          <div class="info"><b>${v.name}</b><span>${v.note}</span></div>
+          <span class="radio">${v.id === state.version ? icon('check', 14) : ''}</span>
+        </button>`).join('')}
+    </div>`);
+}
+
 /* ================= Sheet genérico ================= */
 let sheetOnClose = null;
 function openSheet(html, onClose) {
@@ -622,6 +718,13 @@ const actions = {
     go(`/read/${b}/${c}`);
   },
   'open-settings': () => openSettings(),
+  'open-versions': () => openVersions(),
+  'set-version': (el) => {
+    update({ version: el.dataset.version });
+    closeSheet();
+    toast(`Versão: ${getVersion(state.version).name}`);
+    render();
+  },
   'close-sheet': () => closeSheet(),
   'fav-remove': (el) => {
     const f = state.favorites[Number(el.dataset.i)];
@@ -630,7 +733,7 @@ const actions = {
   },
   'fav-share': async (el) => {
     const f = state.favorites[Number(el.dataset.i)];
-    if (f) share(`"${f.text}"\n— ${refLabel(f.book, f.chapter, f.verse)} (Almeida)`);
+    if (f) share(`"${f.text}"\n— ${refLabel(f.book, f.chapter, f.verse)} (${getVersion(f.version).abbr})`);
   },
   'fav-sel': () => {
     const { book, chapter, verses } = readerCtx;
@@ -658,6 +761,14 @@ async function share(text) {
 }
 
 app.addEventListener('click', (e) => {
+  // toque em um dia do mapa de atividade
+  const cell = e.target.closest('#heat-grid i[data-day]');
+  if (cell) {
+    const [y, m, d] = cell.dataset.day.split('-').map(Number);
+    const n = Number(cell.dataset.n);
+    const when = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(y, m - 1, d));
+    return toast(n ? `${n} ${n === 1 ? 'capítulo' : 'capítulos'} · ${when}` : `Nenhuma leitura · ${when}`);
+  }
   // toque em versículo
   const verse = e.target.closest('#chapter-text .v');
   if (verse) {

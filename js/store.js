@@ -11,7 +11,14 @@ const DEFAULTS = {
   favorites: [],          // [{ book, chapter, verse, text, at }]
   streak: { count: 0, lastDay: null },
   activePlan: 'evangelhos',
+  version: 'almeida',     // id em js/versions.js
+  activity: {},           // { 'AAAA-MM-DD': capítulos lidos no dia }
 };
+
+// chave do dia no fuso local (AAAA-MM-DD)
+export function dayKey(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function safeParse(raw) {
   try { return JSON.parse(raw); } catch { return null; }
@@ -20,7 +27,13 @@ function safeParse(raw) {
 function load() {
   let saved = null;
   try { saved = safeParse(localStorage.getItem(KEY)); } catch { /* storage indisponível */ }
-  return { ...DEFAULTS, ...(saved || {}) };
+  const s = { ...structuredClone(DEFAULTS), ...(saved || {}) };
+  // migração: monta a atividade a partir dos capítulos já lidos
+  if (!saved?.activity) {
+    s.activity = {};
+    Object.values(s.read).forEach(ts => { const k = dayKey(new Date(ts)); s.activity[k] = (s.activity[k] || 0) + 1; });
+  }
+  return s;
 }
 
 const listeners = new Set();
@@ -41,12 +54,17 @@ export function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
-const dayKey = (d = new Date()) => d.toISOString().slice(0, 10);
 
 export function markRead(book, chapter) {
-  state.read[`${book}:${chapter}`] = Date.now();
-  // sequência de dias de leitura
+  const key = `${book}:${chapter}`;
   const today = dayKey();
+  // conta na atividade do dia apenas uma vez por capítulo
+  const prev = state.read[key];
+  if (!prev || dayKey(new Date(prev)) !== today) {
+    state.activity = { ...state.activity, [today]: (state.activity[today] || 0) + 1 };
+  }
+  state.read[key] = Date.now();
+  // sequência de dias de leitura
   const yesterday = dayKey(new Date(Date.now() - 864e5));
   if (state.streak.lastDay !== today) {
     state.streak = {
@@ -64,11 +82,11 @@ export function isFavorite(book, chapter, verse) {
   return state.favorites.some(f => f.book === book && f.chapter === chapter && f.verse === verse);
 }
 
-export function toggleFavorite(book, chapter, verse, text) {
+export function toggleFavorite(book, chapter, verse, text, version = state.version) {
   if (isFavorite(book, chapter, verse)) {
     state.favorites = state.favorites.filter(f => !(f.book === book && f.chapter === chapter && f.verse === verse));
   } else {
-    state.favorites = [{ book, chapter, verse, text, at: Date.now() }, ...state.favorites];
+    state.favorites = [{ book, chapter, verse, text, version, at: Date.now() }, ...state.favorites];
   }
   save();
 }

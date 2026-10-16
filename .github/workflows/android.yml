@@ -30,7 +30,7 @@ jobs:
           cp -r resources build/assets
           cd build
           cat > package.json <<'JSON'
-          { "name": "biblia-app", "version": "0.1.0", "private": true }
+          { "name": "biblia-app", "version": "0.2.0", "private": true }
           JSON
           npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/assets@3
           cat > capacitor.config.json <<'JSON'
@@ -38,7 +38,8 @@ jobs:
             "appId": "com.lucasmendes.biblia",
             "appName": "Bíblia",
             "webDir": "www",
-            "android": { "backgroundColor": "#f4f4f5" }
+            "android": { "backgroundColor": "#f4f4f5" },
+            "plugins": { "CapacitorHttp": { "enabled": true } }
           }
           JSON
           npx cap add android
