@@ -1,6 +1,6 @@
 # Bíblia 📖
 
-App de leitura da Bíblia — simples, amigável e bonito. Versão atual: v0.3.0, feito como PWA em HTML, CSS e JavaScript puro, sem etapa de build.
+App de leitura da Bíblia — simples, amigável e bonito. Versão atual: v0.4.0, feito como PWA em HTML, CSS e JavaScript puro, sem etapa de build.
 
 ![Telas do app](docs/screenshot.png)
 
@@ -13,6 +13,7 @@ O visual segue uma linguagem de cinzas suaves, cards em grafite e acento azul, c
 - **Planos de leitura**: Evangelhos, Salmos e Provérbios, Novo Testamento e Bíblia completa, com progresso
 - **66 livros** organizados por Antigo/Novo Testamento e por grupo, com busca (ignora acentos) e seletor de capítulos
 - **Leitor** com chips de capítulos, marcação automática de capítulo lido ao chegar ao fim, anterior/próximo
+- **Epígrafes** (títulos das seções) em todos os 66 livros, com opção de ocultar
 - **Versículos** um por linha; toque para selecionar um ou vários e favoritar, copiar ou compartilhar
 - **Versões**: Almeida, ARA, ARC, ACF, NAA, NVT, NTLH e King James Atualizada
 - **Aparência**: controle circular do tamanho da letra, espaçamento entre linhas e temas Auto, Sépia, Dia e Noite
@@ -47,6 +48,7 @@ index.html            casca do app (navegação, sheet, barra de ações)
 css/styles.css        tema e componentes (variáveis para Dia/Noite/Sépia)
 js/app.js             rotas, telas e interações
 js/versions.js        versões da Bíblia disponíveis
+js/headings/          epígrafes do AT e do NT (redação própria)
 js/books.js           livros, versículos do dia e planos de leitura
 js/store.js           estado persistido (progresso, favoritos, preferências)
 js/api.js             busca e cache dos capítulos

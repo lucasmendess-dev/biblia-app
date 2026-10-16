@@ -11,7 +11,8 @@ const DEFAULTS = {
   favorites: [],          // [{ book, chapter, verse, text, at }]
   streak: { count: 0, lastDay: null },
   activePlan: 'evangelhos',
-  version: 'almeida',     // id em js/versions.js
+  version: 'almeida',
+  showHeadings: true,     // exibir epígrafes     // id em js/versions.js
   activity: {},           // { 'AAAA-MM-DD': capítulos lidos no dia }
 };
 

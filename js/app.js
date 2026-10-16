@@ -1,6 +1,7 @@
 import { BOOKS, BOOK_BY_ID, TOTAL_CHAPTERS, DAILY_VERSES, PLANS } from './books.js';
 import { state, update, save, markRead, isRead, readCount, isFavorite, toggleFavorite, currentStreak, resetAll, dayKey } from './store.js';
 import { VERSIONS, getVersion } from './versions.js';
+import { headingsFor } from './headings/index.js';
 import { fetchChapter, fetchVerse } from './api.js';
 import { icon } from './icons.js';
 
@@ -454,7 +455,9 @@ async function loadChapterText(bookId, chapter, focusVerse) {
     const { verses } = await fetchChapter(bookId, chapter, state.version);
     if (!readerCtx || readerCtx.book !== bookId || readerCtx.chapter !== chapter) return;
     readerCtx.verses = verses;
+    const heads = state.showHeadings ? headingsFor(bookId, chapter) : {};
     box.innerHTML = verses.map(v =>
+      (heads[v.n] ? `<h3 class="epigrafe">${esc(heads[v.n])}</h3>` : '') +
       `<p class="v ${isFavorite(bookId, chapter, v.n) ? 'fav' : ''}" data-n="${v.n}"><sup>${v.n}</sup>${esc(v.t)}</p>`
     ).join('');
     if (focusVerse) {
@@ -573,7 +576,7 @@ function renderProfile() {
       </button>
     </div>
 
-    <p class="about">Bíblia · versão 0.3.0<br>Almeida (domínio público) via <a href="https://bible-api.com" target="_blank" rel="noopener">bible-api.com</a><br>Demais versões via <a href="https://bolls.life" target="_blank" rel="noopener">bolls.life</a></p>`;
+    <p class="about">Bíblia · versão 0.4.0<br>Almeida (domínio público) via <a href="https://bible-api.com" target="_blank" rel="noopener">bible-api.com</a><br>Demais versões via <a href="https://bolls.life" target="_blank" rel="noopener">bolls.life</a></p>`;
 
   $('#name').onchange = (e) => { update({ name: e.target.value.trim() }); renderProfile(); };
 }
@@ -608,6 +611,11 @@ function openSettings() {
         `<button data-lh="${k}" class="${state.lineHeight === k ? 'active' : ''}">${l}</button>`).join('')}
     </div>
 
+    <div class="options" id="hd-options">
+      <button data-hd="1" class="${state.showHeadings ? 'active' : ''}">Com epígrafes</button>
+      <button data-hd="0" class="${!state.showHeadings ? 'active' : ''}">Sem epígrafes</button>
+    </div>
+
     <div class="ctrl-label">Tamanho da letra</div>
     <div class="dial-wrap" id="dial" role="slider" aria-label="Tamanho da letra" aria-valuemin="${DIAL.min}" aria-valuemax="${DIAL.max}" tabindex="0">
       <svg viewBox="0 0 210 210">
@@ -623,7 +631,7 @@ function openSettings() {
       ${modes.map(([k, l, ic]) => `<button class="mode ${state.theme === k ? 'active' : ''}" data-mode="${k}"><span class="box">${ic}</span>${l}</button>`).join('')}
     </div>
 
-    <div class="preview"><p class="text"><span class="v"><sup>1</sup>No princípio criou Deus os céus e a terra.</span></p></div>
+    <div class="preview"><div class="text"><h3 class="epigrafe">A criação</h3><span class="v"><sup>1</sup>No princípio criou Deus os céus e a terra.</span></div></div>
     <button class="btn" style="margin-top:16px" data-action="close-sheet">Pronto</button>
   `);
 
@@ -661,6 +669,12 @@ function openSettings() {
     const b = e.target.closest('[data-mode]'); if (!b) return;
     update({ theme: b.dataset.mode }); applyPrefs();
     $$('#modes .mode').forEach(m => m.classList.toggle('active', m === b));
+  };
+  $('#hd-options').onclick = (e) => {
+    const b = e.target.closest('[data-hd]'); if (!b) return;
+    update({ showHeadings: b.dataset.hd === '1' });
+    $$('#hd-options button').forEach(x => x.classList.toggle('active', x === b));
+    if (readerCtx && parseRoute().name === 'read') loadChapterText(readerCtx.book, readerCtx.chapter);
   };
   $('#lh-options').onclick = (e) => {
     const b = e.target.closest('[data-lh]'); if (!b) return;

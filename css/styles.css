@@ -487,3 +487,17 @@ input { font: inherit; color: inherit; }
 .l2 { background: color-mix(in srgb, var(--accent) 45%, var(--surface)); }
 .l3 { background: color-mix(in srgb, var(--accent) 75%, var(--surface)); }
 .l4 { background: var(--accent); }
+
+/* ===== Epígrafes ===== */
+.text .epigrafe {
+  font-family: 'Poppins', system-ui, sans-serif;
+  font-size: calc(14px * var(--reader-font) / 100);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ink);
+  margin: 22px 0 8px;
+  padding-left: 12px;
+  border-left: 3px solid var(--accent);
+}
+.text .epigrafe:first-child { margin-top: 4px; }
+.preview .epigrafe { font-size: calc(12.5px * var(--reader-font) / 100); margin: 0 0 6px; }

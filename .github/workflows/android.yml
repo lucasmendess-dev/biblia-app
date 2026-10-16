@@ -30,7 +30,7 @@ jobs:
           cp -r resources build/assets
           cd build
           cat > package.json <<'JSON'
-          { "name": "biblia-app", "version": "0.3.0", "private": true }
+          { "name": "biblia-app", "version": "0.4.0", "private": true }
           JSON
           npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/app@6 @capacitor/assets@3
           cat > capacitor.config.json <<'JSON'
