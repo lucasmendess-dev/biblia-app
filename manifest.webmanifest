@@ -1,0 +1,14 @@
+{
+  "name": "Bíblia",
+  "short_name": "Bíblia",
+  "description": "Leitura da Bíblia simples e bonita, com planos de leitura e favoritos.",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f4f5",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
